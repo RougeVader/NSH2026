@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACM - Autonomous Constellation Manager</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.110/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #000; color: #eee; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        #cesiumContainer { width: 100%; height: 100vh; }
+        #ui-overlay { position: absolute; top: 0; left: 0; width: 350px; height: 100vh; background: rgba(10, 10, 20, 0.85); border-right: 1px solid #444; z-index: 10; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        .panel { padding: 15px; border-bottom: 1px solid #333; }
+        h1 { margin: 0; color: #00d2ff; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .stat-box { background: rgba(255,255,255,0.05); padding: 8px; border-radius: 4px; text-align: center; }
+        .stat-label { font-size: 0.7rem; color: #aaa; }
+        .stat-val { font-size: 1.1rem; font-weight: bold; color: #fff; }
+        
+        #sat-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        .sat-item { background: rgba(255,255,255,0.03); margin-bottom: 5px; padding: 8px; border-radius: 4px; border-left: 3px solid #00ff00; cursor: pointer; transition: 0.2s; }
+        .sat-item:hover { background: rgba(255,255,255,0.1); }
+        .sat-item.warning { border-left-color: #ffcc00; }
+        .sat-item.error { border-left-color: #ff3333; }
+        .sat-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 0.9rem; }
+        .sat-meta { font-size: 0.75rem; color: #aaa; margin-top: 4px; }
+        
+        #controls { position: absolute; bottom: 20px; left: 370px; display: flex; gap: 10px; z-index: 10; }
+        button { background: #00d2ff; border: none; color: #000; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #fff; transform: translateY(-2px); }
+        button.secondary { background: #444; color: #fff; }
+        
+        #warnings { position: absolute; top: 20px; right: 20px; width: 300px; z-index: 10; }
+        .warning-toast { background: rgba(255, 50, 50, 0.9); color: #fff; padding: 12px; border-radius: 4px; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; justify-content: center; align-items: center; flex-direction: column; transition: 0.5s; }
+        .loader { border: 4px solid #333; border-top: 4px solid #00d2ff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loader">
+        <div class="loader"></div>
+        <p style="margin-top: 20px; letter-spacing: 3px;">INITIALIZING ORBITAL ENGINE</p>
+    </div>
+
+    <div id="ui-overlay">
+        <div class="panel">
+            <h1>ACM DASHBOARD</h1>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-label">TIME (UTC)</div>
+                    <div class="stat-val" id="clock">--:--:--</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">SATELLITES</div>
+                    <div class="stat-val" id="sat-count">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">DEBRIS COUNT</div>
+                    <div class="stat-val" id="deb-count">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">COLLISIONS</div>
+                    <div class="stat-val" id="col-count" style="color: #ff3333;">0</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="sat-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <div id="controls">
+        <button onclick="simulateStep(60)">TICK +60s</button>
+        <button onclick="simulateStep(600)" class="secondary">TICK +10m</button>
+        <button onclick="autoSchedule()" style="background: #ffcc00;">AUTO-PLAN</button>
+    </div>
+
+    <div id="warnings" id="warning-container"></div>
+
+    <div id="cesiumContainer"></div>
+
+    <script>
+        // Initialize Cesium
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            terrainProvider: Cesium.createWorldTerrain(),
+            baseLayerPicker: false,
+            geocoder: false,
+            homeButton: false,
+            infoBox: false,
+            navigationHelpButton: false,
+            sceneModePicker: false,
+            selectionIndicator: false,
+            timeline: false,
+            animation: false,
+            skyAtmosphere: false
+        });
+
+        viewer.scene.debugShowFramesPerSecond = true;
+        viewer.scene.globe.enableLighting = true;
+
+        let entities = {
+            sats: {},
+            debris: {}
+        };
+
+        // UI Updates
+        async function updateDashboard() {
+            try {
+                const res = await fetch('/api/visualization/snapshot');
+                const data = await res.json();
+                
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+
+                // Update Stats
+                document.getElementById('clock').innerText = new Date(data.timestamp * 1000).toISOString().split('T')[1].split('.')[0];
+                document.getElementById('sat-count').innerText = data.satellites.length;
+                document.getElementById('deb-count').innerText = data.debris_cloud.length;
+
+                // Update Sat List
+                const list = document.getElementById('sat-list');
+                list.innerHTML = '';
+                data.satellites.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = `sat-item ${s.status === 'NOMINAL' ? '' : 'error'}`;
+                    item.innerHTML = `
+                        <div class="sat-header">
+                            <span>${s.id}</span>
+                            <span>${s.status}</span>
+                        </div>
+                        <div class="sat-meta">
+                            Fuel: ${s.fuel_kg.toFixed(2)} kg | Lat: ${s.lat.toFixed(2)}
+                        </div>
+                    `;
+                    item.onclick = () => {
+                        viewer.zoomTo(entities.sats[s.id]);
+                    };
+                    list.appendChild(item);
+
+                    // Update Map Entity
+                    if (!entities.sats[s.id]) {
+                        entities.sats[s.id] = viewer.entities.add({
+                            name: s.id,
+                            position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt),
+                            point: { pixelSize: 8, color: Cesium.Color.LIME, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+                            label: { text: s.id, font: '12px monospace', style: Cesium.LabelStyle.FILL_AND_OUTLINE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -9) }
+                        });
+                    } else {
+                        entities.sats[s.id].position = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
+                        entities.sats[s.id].point.color = s.status === 'NOMINAL' ? Cesium.Color.LIME : Cesium.Color.RED;
+                    }
+                });
+
+                // Update Debris (Batch update for performance)
+                // For the demo, we only draw a sample of debris if count > 500
+                const debrisToDraw = data.debris_cloud.length > 1000 ? data.debris_cloud.slice(0, 1000) : data.debris_cloud;
+                
+                debrisToDraw.forEach(d => {
+                    const [id, lat, lon, alt] = d;
+                    if (!entities.debris[id]) {
+                        entities.debris[id] = viewer.entities.add({
+                            position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
+                            point: { pixelSize: 2, color: Cesium.Color.RED.withAlpha(0.6) }
+                        });
+                    } else {
+                        entities.debris[id].position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+                    }
+                });
+
+            } catch (e) {
+                console.error("Dashboard update failed", e);
+            }
+        }
+
+        async function simulateStep(seconds) {
+            await fetch('/api/simulate/step', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({step_seconds: seconds})
+            });
+            updateDashboard();
+        }
+
+        async function autoSchedule() {
+            const res = await fetch('/api/maneuver/auto-schedule', { method: 'POST' });
+            const data = await res.json();
+            alert(`Auto-Plan Complete: ${data.actions_taken.length} maneuvers scheduled.`);
+            updateDashboard();
+        }
+
+        setInterval(updateDashboard, 1000);
+    </script>
+</body>
+</html>
