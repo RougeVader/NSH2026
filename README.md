@@ -1,76 +1,64 @@
-# ACM: Autonomous Constellation Manager (Platinum Tier) - NSH 2026
+# ACM: Autonomous Constellation Manager - NSH 2026
 
 ## Project Overview
-**ACM (Autonomous Constellation Manager)** is an elite-tier, mission-critical flight software package designed for the **National Space Hackathon 2026**. This system represents the pinnacle of autonomous orbital management, providing high-fidelity physics, resilient communication modeling, and strategic constellation-aware optimization.
-
-Designed to handle the future of "Mega-Constellations," ACM moves beyond simple reactive scripts to build a holistic, "thinking" brain for satellite fleets.
+The **Autonomous Constellation Manager (ACM)** is a high-fidelity flight software suite designed for the autonomous management of large satellite constellations in Low Earth Orbit (LEO). Developed from the ground up for the **National Space Hackathon 2026**, this system implements rigorous orbital mechanics, resilient communication modeling, and multi-objective optimization to ensure mission safety and constellation uptime.
 
 ---
 
-## 🏆 Platinum Tier: Key Technical Upgrades
-Unlike standard submissions, this project implements advanced aerospace engineering features that reflect real-world orbital operational constraints.
+## Technical Architecture
+The system is built on a modular architecture that separates physical propagation, conjunction assessment, and autonomous maneuver planning.
 
-### 1. High-Fidelity Physics Engine (J2 + SRP)
-*   **RK4 Integrator**: 4th Order Runge-Kutta numerical integration for state propagation.
-*   **J2 Perturbation**: Full modeling of Earth’s oblateness (Nodal Regression and Apsidal Precession).
-*   **Solar Radiation Pressure (SRP)**: Integrated J2000 Sun position modeling with a **Cylindrical Earth Shadow Model** to correctly disable solar flux during eclipse phases.
-*   **Vectorization**: Optimized `rk4_step_batch` logic for handling 10,000+ objects with sub-second latency.
+### 1. High-Fidelity Physics & Propagation
+The core engine utilizes a 4th Order Runge-Kutta (RK4) numerical integrator, incorporating the following perturbations for high-accuracy state estimation:
+*   **J2 Zonal Harmonic Model**: Accounts for Earth’s oblateness, correctly modeling nodal regression and apsidal precession.
+*   **Solar Radiation Pressure (SRP)**: Implements an analytical Sun position model (J2000) with a cylindrical Earth shadow model to ensure physical accuracy during eclipse phases.
+*   **Vectorized Processing**: The propagator is fully vectorized to handle 10,000+ objects simultaneously with sub-second latency.
 
-### 2. Resilient Communication (Refracted LOS)
-*   **Atmospheric Refraction**: Implements **Bennett’s Refraction Formula** for signal bending. This expands Ground Station (GS) availability windows slightly below the 0° geometric horizon, modeling real-world radio propagation.
-*   **Blackout Planning**: The planner proactively identifies LOS blackouts (e.g., over the Pacific) and "uploads" autonomous command sets while the satellite is still in range.
+### 2. Refracted Communication Modeling
+To ensure realistic ground-to-space links, the system calculates Line-of-Sight (LOS) windows using **Bennett’s Atmospheric Refraction Formula**. This accounts for the signal bending at low elevations, providing a high-fidelity model of operational communication constraints.
 
-### 3. Global Fleet Safety & Optimization
-*   **Constellation-Aware COLA**: Evasion maneuvers are checked against the **entire constellation** (500m Fleet Buffer) to ensure an evasion burn doesn't cause a collision with a partner satellite.
-*   **Fuel-Aware Planning**: Uses the **Tsiolkovsky Rocket Equation** to budget maneuvers. If fuel is critical (<5%), the system automatically skips recovery burns to prioritize survival, preventing satellite "burn-out."
-*   **RTN Frame Optimization**: Maneuver planning in the **Radial-Transverse-Normal (RTN)** frame for maximum fuel efficiency.
+### 3. Autonomous Evasion & Safety
+The planner implements a multi-tier safety protocol for Conjunction Analysis and Collision Avoidance (COLA):
+*   **Constellation-Aware Safety**: Evasion maneuvers are dynamically checked against the entire constellation state to prevent secondary inter-satellite collisions.
+*   **Fuel-Budget Awareness**: Utilizing the Tsiolkovsky Rocket Equation, the system budgets maneuvers based on real-time mass depletion. It prioritizes satellite survival (minimal evasion) during low-fuel states.
+*   **Optimal Phasing**: Evasion maneuvers are paired with 2-burn recovery sequences in the Radial-Transverse-Normal (RTN) frame to return satellites to their nominal slots with minimal propellant expenditure.
 
-### 4. Machine Learning & Spatial Indexing
-*   **O(log N) Screening**: Uses **KD-Trees** (Spatial Indexing) for instantaneous conjunction detection in dense debris clouds.
-*   **XGBoost Risk Predictor**: A trained ML model pre-filters conjunctions based on relative velocity vectors and miss-distance history before refining the Time of Closest Approach (TCA).
+### 4. Scalable Conjunction Screening
+*   **Spatial Indexing**: Uses KD-Trees for $O(\log N)$ spatial proximity detection in dense debris environments.
+*   **Machine Learning Integration**: An XGBoost classifier pre-filters high-risk conjunctions based on relative state vectors before precise Time of Closest Approach (TCA) refinement.
 
 ---
 
-## 🚀 Getting Started
+## Deployment & Usage
 
 ### Prerequisites
-*   Docker Desktop (Windows/Linux/Mac).
-*   A modern web browser (Chrome/Edge/Firefox) for the CesiumJS dashboard.
+*   Docker Engine / Docker Desktop.
+*   A modern web browser for the CesiumJS-based dashboard.
 
-### Running the System
+### Installation
 1.  **Clone the Repository**:
     ```bash
     git clone https://github.com/RougeVader/NSH2026.git
     cd NSH2026
     ```
-2.  **Build the Docker Container**:
+2.  **Build and Run**:
     ```bash
-    docker build -t acm-platinum .
+    docker build -t acm-system .
+    docker run -p 8000:8000 acm-system
     ```
-3.  **Run the Deployment**:
-    ```bash
-    docker run -p 8000:8000 acm-platinum
-    ```
-4.  **Access the Orbital Insight Dashboard**:
-    Open `http://localhost:8000`.
+3.  **Access the Dashboard**:
+    Open your browser and navigate to `http://localhost:8000`.
 
 ---
 
-## 📡 API Specifications
-The ACM exposes a robust RESTful API on port 8000 for integration with external mission control systems.
-
-*   **POST /api/telemetry**: Ingest high-frequency state vector updates.
-*   **POST /api/simulate/step**: Advance simulation time (Fast-Forward).
-*   **POST /api/maneuver/auto-schedule**: Trigger the Autonomous Planner.
-*   **GET /api/visualization/snapshot**: Retrieve the global geodetic situational map.
+## API Reference
+The system exposes a RESTful API for mission control integration:
+*   `POST /api/telemetry`: State vector ingestion for fleet and debris.
+*   `POST /api/simulate/step`: Advancement of simulation time.
+*   `POST /api/maneuver/auto-schedule`: Execution of the autonomous COLA engine.
+*   `GET /api/visualization/snapshot`: Real-time geodetic map data.
 
 ---
 
-## 🛠️ Built With
-*   **Core Physics**: NumPy, SciPy (RK4, KD-Tree).
-*   **Intelligence**: XGBoost (Collision Prediction).
-*   **Backend**: FastAPI (Python 3.12).
-*   **Frontend**: CesiumJS (3D Orbital Visualization).
-
-**National Space Hackathon 2026 - IIT Delhi**
-*Submission by Project AETHER Team*
+**National Space Hackathon 2026 - IIT Delhi**  
+*Project AETHER Development Team*
