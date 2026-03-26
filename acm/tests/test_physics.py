@@ -31,7 +31,7 @@ def test_energy_conservation_j2():
     steps = 600
     curr = state.copy()
     for _ in range(steps):
-        curr = rk4_step(curr, dt)
+        curr = rk4_step(curr, dt, 0.0)
         
     v_final = curr[3:]
     r_final = curr[:3]
@@ -67,7 +67,7 @@ def test_raan_drift():
     
     curr_state = state0.copy()
     for _ in range(steps):
-        curr_state = rk4_step(curr_state, dt)
+        curr_state = rk4_step(curr_state, dt, 0.0)
         
     raan1 = get_raan_from_state(curr_state)
     
@@ -115,12 +115,12 @@ def test_batch_propagation_consistency():
     dt = 10.0
     
     # Batch
-    next_batch = rk4_step_batch(states, dt)
+    next_batch = rk4_step_batch(states, dt, 0.0)
     
     # Loop
     next_loop = np.zeros_like(states)
     for i in range(N):
-        next_loop[i] = rk4_step(states[i], dt)
+        next_loop[i] = rk4_step(states[i], dt, 0.0)
         
     assert np.allclose(next_batch, next_loop, atol=1e-12)
 
@@ -165,11 +165,11 @@ def test_orbital_period():
     
     state_final = state0.copy()
     for _ in range(steps):
-        state_final = rk4_step(state_final, dt)
+        state_final = rk4_step(state_final, dt, 0.0)
     
     # Propagate the remaining time
     rem_time = T_theory - steps * dt
-    state_final = rk4_step(state_final, rem_time)
+    state_final = rk4_step(state_final, rem_time, 0.0)
     
     # Check if the final radial distance is close to the initial radial distance.
     # The error should be small.
