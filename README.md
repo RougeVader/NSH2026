@@ -1,65 +1,76 @@
-# Autonomous Constellation Manager (ACM) - NSH 2026
+# ACM: Autonomous Constellation Manager (Platinum Tier) - NSH 2026
 
 ## Project Overview
-ACM is a high-fidelity, autonomous system designed for the **National Space Hackathon 2026**. It manages large satellite constellations in Low Earth Orbit (LEO), ensuring operational safety through advanced physics-based propagation, machine learning-powered conjunction assessment, and autonomous maneuver planning.
+**ACM (Autonomous Constellation Manager)** is an elite-tier, mission-critical flight software package designed for the **National Space Hackathon 2026**. This system represents the pinnacle of autonomous orbital management, providing high-fidelity physics, resilient communication modeling, and strategic constellation-aware optimization.
 
-### Key Features
-*   **High-Fidelity Physics Engine**: Implements an RK4 integrator with J2 perturbation modeling for accurate orbital propagation.
-*   **Two-Stage Conjunction Assessment**:
-    *   **Stage 1**: Fast coarse filtering using KD-Trees for rapid candidate identification.
-    *   **Stage 2**: GPU-accelerated **XGBoost Risk Predictor** (trained on real ESA CDM data) for intelligent pre-filtering, followed by precise TCA refinement.
-*   **Autonomous Maneuver Planner**:
-    *   Plans robust 3-burn sequences (Evasion + 2-burn Recovery) to return satellites to their nominal slots.
-    *   Autonomous command upload logic based on Ground Station Line-of-Sight (LOS) availability.
-    *   Safety pre-check to ensure maneuvers do not introduce new collision risks.
-*   **3D Visualization Dashboard**: Real-time orbital insight powered by CesiumJS, providing global situational awareness.
-*   **Vectorized Simulation**: Optimized tick processing capable of handling 50+ satellites and 10,000+ debris objects with sub-second latency.
+Designed to handle the future of "Mega-Constellations," ACM moves beyond simple reactive scripts to build a holistic, "thinking" brain for satellite fleets.
 
-## Getting Started
+---
+
+## 🏆 Platinum Tier: Key Technical Upgrades
+Unlike standard submissions, this project implements advanced aerospace engineering features that reflect real-world orbital operational constraints.
+
+### 1. High-Fidelity Physics Engine (J2 + SRP)
+*   **RK4 Integrator**: 4th Order Runge-Kutta numerical integration for state propagation.
+*   **J2 Perturbation**: Full modeling of Earth’s oblateness (Nodal Regression and Apsidal Precession).
+*   **Solar Radiation Pressure (SRP)**: Integrated J2000 Sun position modeling with a **Cylindrical Earth Shadow Model** to correctly disable solar flux during eclipse phases.
+*   **Vectorization**: Optimized `rk4_step_batch` logic for handling 10,000+ objects with sub-second latency.
+
+### 2. Resilient Communication (Refracted LOS)
+*   **Atmospheric Refraction**: Implements **Bennett’s Refraction Formula** for signal bending. This expands Ground Station (GS) availability windows slightly below the 0° geometric horizon, modeling real-world radio propagation.
+*   **Blackout Planning**: The planner proactively identifies LOS blackouts (e.g., over the Pacific) and "uploads" autonomous command sets while the satellite is still in range.
+
+### 3. Global Fleet Safety & Optimization
+*   **Constellation-Aware COLA**: Evasion maneuvers are checked against the **entire constellation** (500m Fleet Buffer) to ensure an evasion burn doesn't cause a collision with a partner satellite.
+*   **Fuel-Aware Planning**: Uses the **Tsiolkovsky Rocket Equation** to budget maneuvers. If fuel is critical (<5%), the system automatically skips recovery burns to prioritize survival, preventing satellite "burn-out."
+*   **RTN Frame Optimization**: Maneuver planning in the **Radial-Transverse-Normal (RTN)** frame for maximum fuel efficiency.
+
+### 4. Machine Learning & Spatial Indexing
+*   **O(log N) Screening**: Uses **KD-Trees** (Spatial Indexing) for instantaneous conjunction detection in dense debris clouds.
+*   **XGBoost Risk Predictor**: A trained ML model pre-filters conjunctions based on relative velocity vectors and miss-distance history before refining the Time of Closest Approach (TCA).
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-*   Docker installed on your system.
-*   (Optional) NVIDIA GPU with [NVIDIA Container Toolkit](https://github.com/NVIDIA/nvidia-container-toolkit) for GPU-accelerated ML inference inside Docker.
+*   Docker Desktop (Windows/Linux/Mac).
+*   A modern web browser (Chrome/Edge/Firefox) for the CesiumJS dashboard.
 
-### Running with Docker
-1.  **Build the Image**:
+### Running the System
+1.  **Clone the Repository**:
     ```bash
-    docker build -t acm-system .
+    git clone https://github.com/RougeVader/NSH2026.git
+    cd NSH2026
     ```
-2.  **Run the Container**:
+2.  **Build the Docker Container**:
     ```bash
-    docker run -p 8000:8000 acm-system
+    docker build -t acm-platinum .
     ```
-3.  **Access the Dashboard**:
-    Open your browser and navigate to `http://localhost:8000`.
+3.  **Run the Deployment**:
+    ```bash
+    docker run -p 8000:8000 acm-platinum
+    ```
+4.  **Access the Orbital Insight Dashboard**:
+    Open `http://localhost:8000`.
 
-## API Documentation
+---
 
-### 1. Telemetry Ingestion
-*   **Endpoint**: `POST /api/telemetry`
-*   **Payload**: `{"timestamp": "ISO-8601", "objects": [...]}`
-*   **Action**: Ingests state vectors for satellites and debris.
+## 📡 API Specifications
+The ACM exposes a robust RESTful API on port 8000 for integration with external mission control systems.
 
-### 2. Simulation Control
-*   **Endpoint**: `POST /api/simulate/step`
-*   **Payload**: `{"step_seconds": 60.0}`
-*   **Action**: Advances the global simulation state by the specified duration.
+*   **POST /api/telemetry**: Ingest high-frequency state vector updates.
+*   **POST /api/simulate/step**: Advance simulation time (Fast-Forward).
+*   **POST /api/maneuver/auto-schedule**: Trigger the Autonomous Planner.
+*   **GET /api/visualization/snapshot**: Retrieve the global geodetic situational map.
 
-### 3. Maneuver Scheduling
-*   **Endpoint**: `POST /api/maneuver/schedule`
-*   **Action**: Manually schedule specific burn sequences for satellites.
-*   **Auto-Planning**: `POST /api/maneuver/auto-schedule` triggers the autonomous COLA engine.
+---
 
-### 4. Visualization
-*   **Endpoint**: `GET /api/visualization/snapshot`
-*   **Action**: Returns geodetic coordinates and status for all objects.
+## 🛠️ Built With
+*   **Core Physics**: NumPy, SciPy (RK4, KD-Tree).
+*   **Intelligence**: XGBoost (Collision Prediction).
+*   **Backend**: FastAPI (Python 3.12).
+*   **Frontend**: CesiumJS (3D Orbital Visualization).
 
-## Technical Details
-*   **Propagator**: 4th Order Runge-Kutta (RK4).
-*   **Perturbations**: J2 Zonal Harmonic (Earth Oblateness).
-*   **ML Model**: XGBoost Classifier trained on ESA's Kelvins Collision Avoidance Challenge dataset.
-*   **Frontend**: CesiumJS for 3D globe rendering.
-*   **Backend**: FastAPI (Python 3.11).
-
-## Team
-Developed for the National Space Hackathon 2026.
+**National Space Hackathon 2026 - IIT Delhi**
+*Submission by Project AETHER Team*
