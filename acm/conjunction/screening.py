@@ -35,23 +35,23 @@ class ConjunctionScreening:
         n_steps = int(horizon_s / dt_scan)
         s_curr = sat_state.reshape(1, 6)
         d_curr = debris_states.copy()
+        curr_t = t_start
         
         candidates = set()
         
         for _ in range(n_steps):
             # Distance check (Vectorized)
-            # s_curr is (1, 6), d_curr is (N, 6)
             diff = d_curr[:, :3] - s_curr[:, :3]
             dists = np.linalg.norm(diff, axis=1)
             
-            # Any within 50km?
             near_idx = np.where(dists < 50.0)[0]
             for idx in near_idx:
                 candidates.add(idx)
                 
             # Propagate both
-            s_curr = rk4_step_batch(s_curr, dt_scan)
-            d_curr = rk4_step_batch(d_curr, dt_scan)
+            s_curr = rk4_step_batch(s_curr, dt_scan, curr_t)
+            d_curr = rk4_step_batch(d_curr, dt_scan, curr_t)
+            curr_t += dt_scan
             
         return list(candidates)
 
@@ -109,33 +109,28 @@ class ConjunctionScreening:
                 min_dist = dist
                 tca_coarse = t_curr
             
-            s_curr = rk4_step(s_curr, dt_coarse)
-            d_curr = rk4_step(d_curr, dt_coarse)
+            s_curr = rk4_step(s_curr, dt_coarse, t_curr)
+            d_curr = rk4_step(d_curr, dt_coarse, t_curr)
 
         # 2. ML Pre-filter
-        # Check risk at the point of closest approach found in coarse pass
         if min_dist > 50.0:
             return None
             
-        # Re-propagate to tca_coarse to get exact states for ML
         dt_to_tca = tca_coarse - t_start
-        s_tca_coarse = rk4_step(sat_state, dt_to_tca) # Simplified, should use steps
-        d_tca_coarse = rk4_step(deb_state, dt_to_tca)
+        s_tca_coarse = rk4_step(sat_state, dt_to_tca, t_start) 
+        d_tca_coarse = rk4_step(deb_state, dt_to_tca, t_start)
         
         risk_prob = self.predict_risk(s_tca_coarse, d_tca_coarse)
         
-        # If ML model predicts low risk, we skip expensive refinement
         if risk_prob < 0.5:
-            # But wait, we should be conservative. 
-            # If min_dist is already very small, we might still want to refine.
             if min_dist > 10.0:
                 return None
 
         # 3. Refine using iterative search around tca_coarse
         def get_dist(t):
             dt = t - t_start
-            s = rk4_step(sat_state, dt)
-            d = rk4_step(deb_state, dt)
+            s = rk4_step(sat_state, dt, t_start)
+            d = rk4_step(deb_state, dt, t_start)
             return np.linalg.norm(s[:3] - d[:3])
 
         t_best = tca_coarse
