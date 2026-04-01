@@ -1,5 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from acm.main import app
 from acm.state import state_manager
 
@@ -66,13 +69,36 @@ def test_health_check():
     """
     Test the health check endpoint.
     """
-    # Try with leading slash
     response = client.get("/health")
-    if response.status_code == 404:
-        # Debugging: Print all routes
-        print("\nAvailable routes:")
-        for route in app.routes:
-            print(f"  {route.path}")
-            
     assert response.status_code == 200
     assert response.json()["status"] == "ACM Operational"
+
+def test_schedule_maneuver_naming():
+    """
+    Verify that the API correctly handles the specified naming: burnTime, deltaV_vector.
+    """
+    # Initialize a satellite first
+    client.post("/api/telemetry", json={
+        "timestamp": "2026-03-12T08:00:00.000Z",
+        "objects": [{
+            "id": "SAT-TEST",
+            "type": "SATELLITE",
+            "r": {"x": 7000.0, "y": 0.0, "z": 0.0},
+            "v": {"x": 0.0, "y": 7.5, "z": 0.0}
+        }]
+    })
+    state_manager.last_timestamp = state_manager.parse_time("2026-03-12T08:00:00.000Z")
+    
+    payload = {
+        "satelliteId": "SAT-TEST",
+        "maneuver_sequence": [
+            {
+                "burn_id": "BURN-01",
+                "burnTime": "2026-03-12T09:00:00.000Z",        
+                "deltaV_vector": {"x": 0.0, "y": 0.01, "z": 0.0}
+            }
+        ]
+    }
+    response = client.post("/api/maneuver/schedule", json=payload)
+    assert response.status_code == 202
+    assert response.json()["status"] == "SCHEDULED"

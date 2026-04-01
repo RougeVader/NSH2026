@@ -31,8 +31,8 @@ def propagate_satellite_step(sat: SatelliteState, t_start: float, t_end: float):
     
     for b in pending:
         # Propagate to burn time
-        dt = b.burn_time - current_t
-        state = propagate_state(state, dt)
+        dt_sub = b.burn_time - current_t
+        state = propagate_state(state, dt_sub, t_start=current_t)
                 
         # Apply Burn
         dv_mag = np.linalg.norm(b.dv_eci)
@@ -51,7 +51,7 @@ def propagate_satellite_step(sat: SatelliteState, t_start: float, t_end: float):
         current_t = b.burn_time
         
     # Propagate remainder
-    state = propagate_state(state, final_t - current_t)
+    state = propagate_state(state, final_t - current_t, t_start=current_t)
     sat.state_vector = state
     return executed_count
 
@@ -76,7 +76,7 @@ def simulate_step(payload: SimStepRequest):
             
             # Propagate Nominal Slot
             if sat.nominal_slot is not None:
-                sat.nominal_slot = propagate_state(sat.nominal_slot, dt)
+                sat.nominal_slot = propagate_state(sat.nominal_slot, dt, t_start=t_start)
                 
                 # Check Uptime (10km box)
                 dist = np.linalg.norm(sat.state_vector[:3] - sat.nominal_slot[:3])
@@ -95,11 +95,13 @@ def simulate_step(payload: SimStepRequest):
             
             # Batch Propagation (30s steps)
             steps = int(dt / 30.0)
+            curr_t = t_start
             for _ in range(steps):
-                states = rk4_step_batch(states, 30.0)
+                states = rk4_step_batch(states, 30.0, curr_t)
+                curr_t += 30.0
             rem = dt - steps*30.0
             if rem > 0:
-                states = rk4_step_batch(states, rem)
+                states = rk4_step_batch(states, rem, curr_t)
                 
             for i, did in enumerate(ids):
                 debris_dict[did] = states[i]

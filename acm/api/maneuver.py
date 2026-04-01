@@ -18,7 +18,7 @@ class Vector3(BaseModel):
 class ManeuverItem(BaseModel):
     burn_id: str
     burnTime: str # ISO string
-    deltav_vector: Vector3
+    deltaV_vector: Vector3
 
 class ManeuverRequest(BaseModel):
     satelliteId: str
@@ -87,7 +87,7 @@ def schedule_maneuver(payload: ManeuverRequest):
             # Need state at burn time
             sim_time = state_manager.last_timestamp
             dt_to_burn = b_time - sim_time
-            state_at_burn = propagate_state(sat.state_vector, dt_to_burn)
+            state_at_burn = propagate_state(sat.state_vector, dt_to_burn, t_start=sim_time)
             
             if not has_los(state_at_burn[:3], b_time):
                 # Note: Grader might allow pre-uploading? 
@@ -96,7 +96,7 @@ def schedule_maneuver(payload: ManeuverRequest):
                 pass 
 
             # Constraint: Fuel
-            dv = item.deltav_vector
+            dv = item.deltaV_vector
             dv_mag = np.linalg.norm([dv.x, dv.y, dv.z])
             dm = compute_dm(500.0 + projected_fuel, dv_mag)
             

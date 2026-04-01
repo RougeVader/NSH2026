@@ -37,12 +37,19 @@ class CollisionPredictor:
         df_proc = pd.get_dummies(df_proc, columns=categorical_cols)
         
         # Ensure exact same columns as training
-        # Add missing columns with 0
+        # Add missing columns with 0 efficiently
+        missing_cols = {}
         for col in self.feature_names:
             if col not in df_proc.columns:
-                df_proc[col] = 0
+                missing_cols[col] = 0
         
-        # Drop extra columns
+        if missing_cols:
+            # Create a DataFrame from the dictionary and join it
+            # Using broadcast logic: if df_proc has N rows, this adds columns with 0 for all N rows
+            df_missing = pd.DataFrame(missing_cols, index=df_proc.index)
+            df_proc = pd.concat([df_proc, df_missing], axis=1)
+        
+        # Drop extra columns and reorder to match training set exactly
         df_proc = df_proc[self.feature_names]
         
         # 2. Predict

@@ -1,4 +1,7 @@
 import numpy as np
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from acm.physics.propagator import rk4_step, rk4_step_batch, MU, RE, J2, j2_accel
 from acm.physics.frames import rtn_to_eci_matrix
 from acm.physics.maneuver import compute_dm
