@@ -52,5 +52,34 @@ The system has been rigorously benchmarked to ensure it exceeds the requirements
 
 ---
 
+## How to verify everything is working:
+   * Visualizer: Go to http://localhost:8000 in your browser.
+   * Health Check: Go to http://localhost:8000/health. You should see {"status": "ACM Operational"}.
+   * Automatic Benchmarks: Check the BENCHMARKS.md file in the folder; it updates itself automatically every time you run the tests!
+
+## For Docker Visuals
+  *open your terminal (Command Prompt or PowerShell on Windows).
+    * Navigate to the project folder:
+      **cd path/to/upload_ready
+    *Build the system:
+      **docker build -t acm-system .
+    *Run the system:
+      **docker run -p 8000:8000 acm-system
+    *View the App: Open your web browser and go to
+     **http://localhost:8000. You will see the Geodetic Visualizer live!
+
+## For Python
+*Open your terminal and enter the folder:
+ **cd path/to/upload_ready
+*Install dependencies:
+ **pip install -r requirements.txt
+
+*Run the entire system:
+ **python run.py acm/main.py
+
+*Run the Performance Benchmarks (See the math work):
+*Open a new terminal window and run:
+ **python run.py generate_benchmarks.py
+
 **National Space Hackathon 2026 - IIT Delhi**  
 *Project AETHER - TeamAtomV2*
