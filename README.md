@@ -53,4 +53,4 @@ The system has been rigorously benchmarked to ensure it exceeds the requirements
 ---
 
 **National Space Hackathon 2026 - IIT Delhi**  
-*Project AETHER Development Team*
+*Project AETHER - TeamAtomV2*

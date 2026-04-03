@@ -48,11 +48,12 @@ def get_snapshot():
             geodetics = eci_to_geodetic_batch(states, ts)
             
             # Construct flattened tuples: [id, lat, lon, alt]
-            # Use list comprehension for speed
-            debris_cloud = [
-                (ids[i], float(geodetics[i, 0]), float(geodetics[i, 1]), float(geodetics[i, 2]))
-                for i in range(len(ids))
-            ]
+            # Filter out any NaN/Inf values that could crash the frontend
+            debris_cloud = []
+            for i in range(len(ids)):
+                lat, lon, alt = geodetics[i]
+                if np.all(np.isfinite([lat, lon, alt])):
+                    debris_cloud.append((ids[i], float(lat), float(lon), float(alt)))
                 
     return {
         "timestamp": ts,

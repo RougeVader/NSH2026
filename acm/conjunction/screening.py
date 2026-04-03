@@ -100,7 +100,7 @@ class ConjunctionScreening:
         d_en = d_v_mags**2 / 2 - MU / d_r_mags
         d_a = -MU / (2 * d_en)
         d_h = np.linalg.norm(np.cross(debris_states[:, :3], debris_states[:, 3:]), axis=1)
-        d_e = np.sqrt(np.maximum(0, 1 + 2 * d_en * d_h**2 / MU**2))
+        d_e = np.sqrt(np.maximum(0.0, 1 + 2 * d_en * d_h**2 / MU**2))
         
         d_min = d_a * (1 - d_e)
         d_max = d_a * (1 + d_e)
@@ -182,7 +182,7 @@ class ConjunctionScreening:
         
         for i in range(steps):
             t_curr = t_start + i * dt_coarse
-            dist = np.linalg.norm(s_curr[:3] - d_curr[:3])
+            dist = float(np.linalg.norm(s_curr[:3] - d_curr[:3]))
             
             if dist < min_dist:
                 min_dist = dist
@@ -209,14 +209,14 @@ class ConjunctionScreening:
                         return None
 
         # 3. Refine using iterative search around tca_coarse (1ms precision)
-        def get_dist(t):
+        def get_dist(t) -> float:
             dt = t - t_start
             s = rk4_step(sat_state, dt, t_start)
             d = rk4_step(deb_state, dt, t_start)
-            return np.linalg.norm(s[:3] - d[:3])
+            return float(np.linalg.norm(s[:3] - d[:3]))
 
         t_best = tca_coarse
-        d_best = min_dist
+        d_best = float(min_dist)
         
         step = dt_coarse / 2.0
         while step > 0.001: # 1ms precision (Upgraded from 100ms)
@@ -224,10 +224,10 @@ class ConjunctionScreening:
             d_minus = get_dist(t_best - step)
             
             if d_plus < d_best:
-                d_best = d_plus
+                d_best = float(d_plus)
                 t_best += step
             elif d_minus < d_best:
-                d_best = d_minus
+                d_best = float(d_minus)
                 t_best -= step
             else:
                 step /= 2.0

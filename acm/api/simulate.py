@@ -35,7 +35,7 @@ def propagate_satellite_step(sat: SatelliteState, t_start: float, t_end: float):
         state = propagate_state(state, dt_sub, t_start=current_t)
                 
         # Apply Burn
-        dv_mag = np.linalg.norm(b.dv_eci)
+        dv_mag = float(np.linalg.norm(b.dv_eci))
         current_total_mass = 500.0 + sat.fuel_kg
         dm = compute_dm(current_total_mass, dv_mag)
         
@@ -160,6 +160,8 @@ def simulate_step(payload: SimStepRequest):
     # EOL logic
     for sat in state_manager.satellites.values():
         if sat.fuel_kg < 2.5 and sat.status != "EOL_GRAVEYARD":
+            if sat.state_vector is None:
+                continue
             r_mag = np.linalg.norm(sat.state_vector[:3])
             v_mag = np.sqrt(MU / r_mag)
             dv_mag = v_mag * (np.sqrt((2*(r_mag + 200)) / (2*r_mag + 200)) - 1)

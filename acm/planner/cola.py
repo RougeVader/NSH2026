@@ -1,6 +1,6 @@
 import numpy as np
 import math
-from typing import List
+from typing import List, Any
 
 from acm.physics.propagator import rk4_step, MU, RE, propagate_state
 from acm.physics.frames import dv_rtn_to_eci, eci_to_ecef, rtn_to_eci_matrix
@@ -15,7 +15,7 @@ DRY_MASS = 500.0 # kg
 MAX_DV = 0.015 # km/s (15 m/s)
 COOLDOWN = 600.0 # seconds
 
-def compute_elevation(gs: dict, r_eci: np.ndarray, t_unix: float) -> float:
+def compute_elevation(gs: Any, r_eci: np.ndarray, t_unix: float) -> float:
     """
     Computes elevation angle (degrees) from GS, corrected for atmospheric refraction.
     Uses Bennett's formula for refraction bending.
@@ -58,7 +58,7 @@ def has_los(r_eci: np.ndarray, t_unix: float) -> bool:
     """Checks if satellite has LOS to ANY ground station."""
     for gs in GROUND_STATIONS:
         el = compute_elevation(gs, r_eci, t_unix)
-        if el >= gs['min_el']:
+        if el >= float(str(gs['min_el'])):
             return True
     return False
 
@@ -68,6 +68,8 @@ def find_last_los_window(sat: SatelliteState, t_target: float, t_start_search: f
     """
     step = 30.0
     curr_t = t_start_search
+    if sat.state_vector is None:
+        return -1.0
     state = sat.state_vector.copy()
     last_valid_t = -1.0
     
@@ -97,10 +99,12 @@ def check_collision_during_burn(sat_id: str, new_state: np.ndarray, burn_time: f
     with state_manager.lock:
         for other_id, other_sat in state_manager.satellites.items():
             if other_id == sat_id: continue
+            other_sv = other_sat.state_vector
+            if other_sv is None: continue
             
             # Propagate other sat to burn_time for dynamic safety
             dt = burn_time - state_manager.last_timestamp
-            other_pos = propagate_state(other_sat.state_vector, dt, state_manager.last_timestamp)[:3]
+            other_pos = propagate_state(other_sv, dt, state_manager.last_timestamp)[:3]
             
             if np.linalg.norm(new_state[:3] - other_pos) < 0.5: # 500m fleet buffer
                 return True
@@ -194,7 +198,7 @@ def plan_evasion(sat: SatelliteState, cdm: CDM, current_time: float) -> List[Man
     dv1_rtn, dv2_rtn = compute_phasing_burns(dr_rtn, dv_rtn, n, T_phase)
     
     # --- FUEL CHECK: RECOVERY ---
-    dv_rec_total = np.linalg.norm(dv1_rtn) + np.linalg.norm(dv2_rtn)
+    dv_rec_total = float(np.linalg.norm(dv1_rtn) + np.linalg.norm(dv2_rtn))
     fuel_rec = compute_dm(total_mass, dv_rec_total)
     
     if fuel_rec > (available_fuel - 0.05): # Leave a 50g emergency buffer
@@ -222,3 +226,4 @@ def plan_evasion(sat: SatelliteState, cdm: CDM, current_time: float) -> List[Man
     ))
     
     return maneuvers
+
