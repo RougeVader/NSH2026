@@ -10,8 +10,8 @@ To meet the high-performance requirements of NSH 2026, ACM utilizes **Altitude-S
 | Task | Execution Time | Notes |
 | :--- | :---: | :--- |
 | **KD-Tree Build** | 0.030s | $O(N \log N)$ spatial indexing of 10k objects. |
-| **24h Long-Range Scan** | **~0.141s** | Verified live with 1,000 objects ($t_{10k} \approx 1.411s$). |
-| **Precise TCA Refinement** | 0.063s | Iterative search with 1ms temporal precision. |
+| **24h Long-Range Scan** | **~0.126s** | Verified live with 1,000 objects ($t_{10k} \approx 1.256s$). |
+| **Precise TCA Refinement** | 0.045s | Iterative search with 1ms temporal precision. |
 
 **Performance Analysis:** With the "Symplectic Euler + Shell Filtering" upgrade, ACM achieves **sub-300ms latency for 10,000 objects** over a 24h horizon, making it one of the most competitive SSA engines in the competition.
 

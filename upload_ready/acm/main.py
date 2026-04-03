@@ -49,12 +49,18 @@ async def lifespan(app: FastAPI):
         debs = []
         for i in range(1000):
             vec = np.random.randn(3)
-            vec /= np.linalg.norm(vec)
+            v_norm = np.linalg.norm(vec)
+            if v_norm < 1e-9: vec = np.array([1.0, 0.0, 0.0])
+            else: vec /= v_norm
+            
             d_r_mag = R_EARTH + 300 + np.random.rand() * 700
             pos = vec * d_r_mag
             v_vec = np.random.randn(3)
             v_vec = np.cross(vec, v_vec)
-            v_vec /= np.linalg.norm(v_vec)
+            vv_norm = np.linalg.norm(v_vec)
+            if vv_norm < 1e-9: v_vec = np.array([0.0, 1.0, 0.0])
+            else: v_vec /= vv_norm
+            
             vel = v_vec * np.sqrt(mu / d_r_mag)
             debs.append({
                 "id": f"DEB-{i:04d}",

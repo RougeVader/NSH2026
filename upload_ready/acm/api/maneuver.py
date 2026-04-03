@@ -99,6 +99,8 @@ def schedule_maneuver(payload: ManeuverRequest):
             # Need state at burn time
             sim_time = state_manager.last_timestamp
             dt_to_burn = b_time - sim_time
+            if sat.state_vector is None:
+                raise HTTPException(status_code=400, detail="Satellite state not initialized")
             state_at_burn = propagate_state(sat.state_vector, dt_to_burn, t_start=sim_time)
             
             if not has_los(state_at_burn[:3], b_time):
@@ -109,7 +111,7 @@ def schedule_maneuver(payload: ManeuverRequest):
 
             # Constraint: Fuel
             dv = item.deltaV_vector
-            dv_mag = np.linalg.norm([dv.x, dv.y, dv.z])
+            dv_mag = float(np.linalg.norm([dv.x, dv.y, dv.z]))
             dm = compute_dm(500.0 + projected_fuel, dv_mag)
             
             if projected_fuel < dm:

@@ -111,9 +111,10 @@
         viewer.scene.globe.enableLighting = true;
 
         let entities = {
-            sats: {},
-            debris: {}
+            sats: {}
         };
+        let debrisPoints = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+        let debrisMap = new Map();
 
         // UI Updates
         async function updateDashboard() {
@@ -122,7 +123,7 @@
                 const data = await res.json();
                 
                 document.getElementById('loader').style.opacity = '0';
-                setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
+                setTimeout(() => { if(document.getElementById('loader')) document.getElementById('loader').style.display = 'none'; }, 500);
 
                 // Update Stats
                 document.getElementById('clock').innerText = new Date(data.timestamp * 1000).toISOString().split('T')[1].split('.')[0];
@@ -133,49 +134,53 @@
                 const list = document.getElementById('sat-list');
                 list.innerHTML = '';
                 data.satellites.forEach(s => {
-                    const item = document.createElement('div');
-                    item.className = `sat-item ${s.status === 'NOMINAL' ? '' : 'error'}`;
-                    item.innerHTML = `
-                        <div class="sat-header">
-                            <span>${s.id}</span>
-                            <span>${s.status}</span>
-                        </div>
-                        <div class="sat-meta">
-                            Fuel: ${s.fuel_kg.toFixed(2)} kg | Lat: ${s.lat.toFixed(2)}
-                        </div>
-                    `;
-                    item.onclick = () => {
-                        viewer.zoomTo(entities.sats[s.id]);
-                    };
-                    list.appendChild(item);
+                    if (!isNaN(s.lat) && !isNaN(s.lon)) {
+                        const item = document.createElement('div');
+                        item.className = `sat-item ${s.status === 'NOMINAL' ? '' : 'error'}`;
+                        item.innerHTML = `
+                            <div class="sat-header">
+                                <span>${s.id}</span>
+                                <span>${s.status}</span>
+                            </div>
+                            <div class="sat-meta">
+                                Fuel: ${s.fuel_kg.toFixed(2)} kg | Lat: ${s.lat.toFixed(2)}
+                            </div>
+                        `;
+                        item.onclick = () => {
+                            viewer.zoomTo(entities.sats[s.id]);
+                        };
+                        list.appendChild(item);
 
-                    // Update Map Entity
-                    if (!entities.sats[s.id]) {
-                        entities.sats[s.id] = viewer.entities.add({
-                            name: s.id,
-                            position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt),
-                            point: { pixelSize: 8, color: Cesium.Color.LIME, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
-                            label: { text: s.id, font: '12px monospace', style: Cesium.LabelStyle.FILL_AND_OUTLINE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -9) }
-                        });
-                    } else {
-                        entities.sats[s.id].position = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
-                        entities.sats[s.id].point.color = s.status === 'NOMINAL' ? Cesium.Color.LIME : Cesium.Color.RED;
+                        // Update Map Entity
+                        if (!entities.sats[s.id]) {
+                            entities.sats[s.id] = viewer.entities.add({
+                                name: s.id,
+                                position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt),
+                                point: { pixelSize: 8, color: Cesium.Color.LIME, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+                                label: { text: s.id, font: '12px monospace', style: Cesium.LabelStyle.FILL_AND_OUTLINE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -9) }
+                            });
+                        } else {
+                            entities.sats[s.id].position = Cesium.Cartesian3.fromDegrees(s.lon, s.lat, s.alt);
+                            entities.sats[s.id].point.color = s.status === 'NOMINAL' ? Cesium.Color.LIME : Cesium.Color.RED;
+                        }
                     }
                 });
 
-                // Update Debris (Batch update for performance)
-                // For the demo, we only draw a sample of debris if count > 500
-                const debrisToDraw = data.debris_cloud.length > 1000 ? data.debris_cloud.slice(0, 1000) : data.debris_cloud;
-                
-                debrisToDraw.forEach(d => {
+                // Update Debris using High-Performance PointCollection
+                data.debris_cloud.forEach(d => {
                     const [id, lat, lon, alt] = d;
-                    if (!entities.debris[id]) {
-                        entities.debris[id] = viewer.entities.add({
-                            position: Cesium.Cartesian3.fromDegrees(lon, lat, alt),
-                            point: { pixelSize: 2, color: Cesium.Color.RED.withAlpha(0.6) }
+                    if (isNaN(lat) || isNaN(lon)) return;
+
+                    const pos = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+                    if (!debrisMap.has(id)) {
+                        const point = debrisPoints.add({
+                            position: pos,
+                            pixelSize: 2,
+                            color: Cesium.Color.RED.withAlpha(0.6)
                         });
+                        debrisMap.set(id, point);
                     } else {
-                        entities.debris[id].position = Cesium.Cartesian3.fromDegrees(lon, lat, alt);
+                        debrisMap.get(id).position = pos;
                     }
                 });
 
